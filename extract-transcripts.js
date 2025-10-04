@@ -230,6 +230,40 @@ function convertExistingTxtTranscripts(directoryPath) {
 	})
 }
 
+function moveMarkdownTranscriptsIntoShowDirectories(directoryPath) {
+	if (!fs.existsSync(directoryPath)) {
+		return
+	}
+
+	const entries = fs.readdirSync(directoryPath, { withFileTypes: true })
+
+	entries.forEach((entry) => {
+		if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".md") {
+			return
+		}
+
+		const showSlug = entry.name.split("_")[0] || "unknown-show"
+		const showDir = path.join(directoryPath, showSlug)
+		if (!fs.existsSync(showDir)) {
+			fs.mkdirSync(showDir, { recursive: true })
+		}
+
+		const currentPath = path.join(directoryPath, entry.name)
+		const targetPath = path.join(showDir, entry.name)
+		if (currentPath !== targetPath) {
+			fs.renameSync(currentPath, targetPath)
+		}
+	})
+}
+
+function ensureShowOutputDirectory(baseDirectory, showSlug) {
+	const directoryPath = path.join(baseDirectory, showSlug)
+	if (!fs.existsSync(directoryPath)) {
+		fs.mkdirSync(directoryPath, { recursive: true })
+	}
+	return directoryPath
+}
+
 // Create output directory if it doesn't exist
 if (!fs.existsSync("./transcripts")) {
 	fs.mkdirSync("./transcripts")
@@ -266,6 +300,7 @@ if (process.argv.length >= 4 && !includeTimestamps) {
 	const filenameCounts = new Map()
 
 	convertExistingTxtTranscripts("./transcripts")
+	moveMarkdownTranscriptsIntoShowDirectories("./transcripts")
 
 	ttmlFiles.forEach((file) => {
 		const metadata = metadataMap.get(file.identifier) || null
@@ -280,7 +315,8 @@ if (process.argv.length >= 4 && !includeTimestamps) {
 		const suffix = count === 0 ? "" : `-${count}`
 		filenameCounts.set(baseName, count + 1)
 
-		const outputPath = path.join("./transcripts", `${baseName}${suffix}.md`)
+		const outputDir = ensureShowOutputDirectory("./transcripts", showSlug)
+		const outputPath = path.join(outputDir, `${baseName}${suffix}.md`)
 		const data = fs.readFileSync(file.path, "utf8")
 		extractTranscript(data, outputPath, includeTimestamps)
 	})
