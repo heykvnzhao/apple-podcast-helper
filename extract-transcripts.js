@@ -38,12 +38,16 @@ function ensureTranscriptsDirectory() {
 
 function parseCliArguments(argv) {
 	const flags = {
-		includeTimestamps: false,
+		includeTimestamps: true,
 	}
 	const positional = []
 	argv.forEach((arg) => {
 		if (arg === "--timestamps") {
 			flags.includeTimestamps = true
+			return
+		}
+		if (arg === "--no-timestamps") {
+			flags.includeTimestamps = false
 			return
 		}
 		positional.push(arg)
@@ -325,10 +329,10 @@ function printUsage() {
 	console.error("Invalid arguments.")
 	console.error("Usage:")
 	console.error(
-		"  For single file: node extract-transcripts.js <input.ttml> <output.md> [--timestamps]",
+		"  For single file: node extract-transcripts.js <input.ttml> <output.md> [--no-timestamps]",
 	)
 	console.error(
-		"  For all files: node extract-transcripts.js [--timestamps]",
+		"  For all files: node extract-transcripts.js [--no-timestamps]",
 	)
 }
 

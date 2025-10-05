@@ -5,7 +5,7 @@ The core entry point is `extract-transcripts.js`, which drives transcript discov
 
 ## Build, Test, and Development Commands
 - `pnpm install` (or `npm install`) — install `xml2js` and sync the lockfile.
-- `node extract-transcripts.js --timestamps` — batch-export every cached transcript into Markdown with timestamp markers.
+- `node extract-transcripts.js --no-timestamps` — batch-export every cached transcript without timestamp markers.
 - `node extract-transcripts.js path/to/file.ttml transcripts/sample.md` — run a targeted conversion while iterating on parsing changes.
 - `NODE_ENV=development node extract-transcripts.js` — enable verbose logging blocks guarded by `process.env.NODE_ENV` if you add them.
 

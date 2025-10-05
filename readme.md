@@ -30,17 +30,18 @@ The script supports batch export of everything in the Podcasts cache or processi
 ### Batch mode
 
 ```bash
-node extract-transcripts.js [--timestamps]
+node extract-transcripts.js [--no-timestamps]
 ```
 
 - Recursively scans the TTML cache, converts each transcript to Markdown, and writes files to `./transcripts/`.
+- Timestamps are included by default; pass `--no-timestamps` if you want raw transcript text.
 - Filenames follow `podcast-show-name_YYYY-MM-DD_episode-title-up-to-20-chars.md`.
 - Re-running keeps the folder tidy: any legacy `.txt` exports get upgraded to `.md` automatically.
 
 ### Single-file mode
 
 ```bash
-node extract-transcripts.js path/to/input.ttml path/to/output.md [--timestamps]
+node extract-transcripts.js path/to/input.ttml path/to/output.md [--no-timestamps]
 ```
 
 - Useful if you want to experiment with one transcript outside the cache.
@@ -48,7 +49,7 @@ node extract-transcripts.js path/to/input.ttml path/to/output.md [--timestamps]
 
 ### Optional flags
 
-- `--timestamps` – prepend `[HH:MM:SS]` markers before each paragraph in the Markdown output.
+- `--no-timestamps` – disable `[HH:MM:SS]` markers when you want plain paragraphs.
 
 ### Listening status metadata & manifest
 
