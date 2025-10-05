@@ -206,6 +206,38 @@ async function handleBatch({ includeTimestamps }) {
 	const metadataFilenameIndex = buildMetadataFilenameIndex(metadataMap)
 	const filenameCounts = new Map()
 
+	const sortedTtmlFiles = [...ttmlFiles].sort((a, b) => {
+		const metaA = metadataMap.get(a.identifier) || null
+		const metaB = metadataMap.get(b.identifier) || null
+		const dateA =
+			metaA && metaA.pubDate && metaA.pubDate !== "unknown-date"
+				? metaA.pubDate
+				: "9999-12-31"
+		const dateB =
+			metaB && metaB.pubDate && metaB.pubDate !== "unknown-date"
+				? metaB.pubDate
+				: "9999-12-31"
+		if (dateA !== dateB) {
+			return dateA.localeCompare(dateB)
+		}
+		const showTitleA =
+			metaA && metaA.showTitle && metaA.showTitle !== "unknown show"
+				? metaA.showTitle.toLowerCase()
+				: metaA && metaA.showSlug
+					? formatSlugAsTitle(metaA.showSlug).toLowerCase()
+					: ""
+		const showTitleB =
+			metaB && metaB.showTitle && metaB.showTitle !== "unknown show"
+				? metaB.showTitle.toLowerCase()
+				: metaB && metaB.showSlug
+					? formatSlugAsTitle(metaB.showSlug).toLowerCase()
+					: ""
+		if (showTitleA !== showTitleB) {
+			return showTitleA.localeCompare(showTitleB)
+		}
+		return a.identifier.localeCompare(b.identifier)
+	})
+
 	const prepManifestChanged = prepareExistingMarkdown(metadataFilenameIndex, manifest)
 
 	const summary = {
@@ -219,7 +251,7 @@ async function handleBatch({ includeTimestamps }) {
 
 	const identifiersSet = new Set(identifiers)
 
-	for (const file of ttmlFiles) {
+	for (const file of sortedTtmlFiles) {
 		const metadata = metadataMap.get(file.identifier) || null
 		const showSlug = slugify(metadata ? metadata.showTitle : null, "unknown-show")
 		const rawEpisodeTitle = metadata
