@@ -30,7 +30,7 @@ The script supports batch export of everything in the Podcasts cache or processi
 ### Batch mode
 
 ```bash
-node extractTranscript.js [--timestamps]
+node extract-transcripts.js [--timestamps]
 ```
 
 - Recursively scans the TTML cache, converts each transcript to Markdown, and writes files to `./transcripts/`.
@@ -40,7 +40,7 @@ node extractTranscript.js [--timestamps]
 ### Single-file mode
 
 ```bash
-node extractTranscript.js path/to/input.ttml path/to/output.md [--timestamps]
+node extract-transcripts.js path/to/input.ttml path/to/output.md [--timestamps]
 ```
 
 - Useful if you want to experiment with one transcript outside the cache.
@@ -50,10 +50,17 @@ node extractTranscript.js path/to/input.ttml path/to/output.md [--timestamps]
 
 - `--timestamps` – prepend `[HH:MM:SS]` markers before each paragraph in the Markdown output.
 
+### Listening status metadata & manifest
+
+- Markdown exports now include a `## Listening status` section summarising whether you have completed the episode, your progress, time remaining, last played timestamp, and play count (when available from `MTLibrary.sqlite`).
+- The script writes a manifest at `transcripts/.listening-status.json` to remember listening status and file mappings for episodes whose TTML cache entries are later purged. The manifest lives inside the `transcripts/` directory, which remains git ignored.
+- When the manifest references an episode that no longer has a TTML file, the CLI logs how many transcripts were retained from the manifest and keeps their Markdown files untouched.
+- To prune finished transcripts later, delete the Markdown file(s) under `transcripts/<show>/` and remove the matching entry from the manifest (look up the transcript identifier or relative path); the next batch run will rebuild the manifest without those entries.
+
 ## Troubleshooting and tips
 
 - If you see `TTML directory not found`, double-check that transcripts exist locally and that you are running on macOS under the same user account as the Podcasts app.
-- Metadata comes from `MTLibrary.sqlite` in the Podcasts container. If the script cannot read it, filenames fall back to `unknown-show_unknown-date_*`. Ensure the Podcasts app is closed and that the database path exists.
+- Metadata comes from `MTLibrary.sqlite` in the Podcasts container. If the script cannot read it, filenames fall back to `unknown-show_unknown-date_*` and listening status will be omitted. Ensure the Podcasts app is closed and that the database path exists.
 - The default `transcripts/` directory is git-ignored; feel free to delete or relocate it between runs.
 
 ## Next steps
