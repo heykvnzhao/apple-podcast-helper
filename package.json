@@ -1,4 +1,10 @@
 {
+	"name": "apple-podcast-helper",
+	"version": "0.0.0",
+	"scripts": {
+		"transcripts": "node extract-transcripts.js",
+		"sync": "node extract-transcripts.js sync"
+	},
 	"dependencies": {
 		"xml2js": "^0.6.2"
 	}
