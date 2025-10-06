@@ -87,9 +87,11 @@ function parseCliArguments(argv) {
 	const rawArgs = Array.isArray(argv) ? argv.slice() : []
 	const args = []
 	let flaggedCommand = null
+	let syncFlagEncountered = false
 	rawArgs.forEach((arg) => {
 		if (arg === "--sync") {
 			flaggedCommand = "sync"
+			syncFlagEncountered = true
 			return
 		}
 		if (arg === "--pick") {
@@ -99,9 +101,13 @@ function parseCliArguments(argv) {
 		args.push(arg)
 	})
 	if (flaggedCommand) {
+		const options = parseCommandOptions(flaggedCommand, args)
+		if (syncFlagEncountered && options && typeof options === "object") {
+			options.launchPickerAfterSync = true
+		}
 		return {
 			command: flaggedCommand,
-			options: parseCommandOptions(flaggedCommand, args),
+			options,
 		}
 	}
 	if (args.length === 0) {
@@ -532,6 +538,69 @@ function truncateToWidth(value, width) {
 	return `${str.slice(0, sliceWidth)}…`
 }
 
+function truncateForDisplay(value, width) {
+	if (!Number.isFinite(width) || width <= 0) {
+		return ""
+	}
+	const str = value || ""
+	if (str.length <= width) {
+		return str
+	}
+	const sliceWidth = Math.max(width - 1, 0)
+	return `${str.slice(0, sliceWidth)}…`
+}
+
+function formatDurationShort(seconds) {
+	if (!Number.isFinite(seconds)) {
+		return null
+	}
+	const totalSeconds = Math.max(Math.round(seconds), 0)
+	const hours = Math.floor(totalSeconds / 3600)
+	const minutes = Math.floor((totalSeconds % 3600) / 60)
+	const remainingSeconds = totalSeconds % 60
+	const parts = []
+	if (hours > 0) {
+		parts.push(`${hours}h`)
+	}
+	if (minutes > 0) {
+		parts.push(`${minutes}m`)
+	}
+	if (parts.length === 0) {
+		parts.push(`${remainingSeconds}s`)
+	}
+	return parts.join(" ")
+}
+
+function formatListeningStatusSummary(entry) {
+	if (!entry || !entry.metadata || !entry.metadata.listeningStatus) {
+		return null
+	}
+	const status = entry.metadata.listeningStatus
+	const playState = normalizePlayState(status.playState)
+	if (playState === "played") {
+		return "Finished"
+	}
+	if (playState === "unplayed") {
+		return "Not started"
+	}
+	if (playState === "inProgress") {
+		const percent =
+			typeof status.completionRatio === "number"
+				? Math.round(status.completionRatio * 100)
+				: null
+		const remainingLabel = formatDurationShort(status.remainingSeconds)
+		const pieces = ["In progress"]
+		if (percent != null && Number.isFinite(percent)) {
+			pieces.push(`${percent}%`)
+		}
+		if (remainingLabel) {
+			pieces.push(`${remainingLabel} left`)
+		}
+		return pieces.join(" • ")
+	}
+	return null
+}
+
 function printEpisodeLogHeader() {
 	const headerCells = [
 		truncateToWidth("STATE", EPISODE_LOG_COLUMNS.state),
@@ -598,6 +667,31 @@ function formatListLogLine({ index, entry }) {
 		truncateToWidth(locationLabel, LIST_COMMAND_COLUMNS.location),
 	]
 	return `${status.icon} │ ${cells.join(" │ ")}`
+}
+
+function buildPickerEntryLines({ entry, displayIndex, isActive, indexWidth, maxWidth }) {
+	const pointer = isActive ? ">" : " "
+	const safeIndexWidth = Math.max(indexWidth || 0, 2)
+	const label = String(displayIndex || "").padStart(safeIndexWidth, " ")
+	const showTitle = entry && entry.showTitle ? entry.showTitle : "Unknown show"
+	const episodeTitle = entry && entry.episodeTitle ? entry.episodeTitle : "Unknown episode"
+	const title = `${showTitle} - ${episodeTitle}`
+	const titleWidth = Math.max((maxWidth || 0) - (safeIndexWidth + 4), 16)
+	const titleLine = `${pointer} ${label}. ${truncateForDisplay(title, titleWidth)}`
+	const metaParts = []
+	if (entry && entry.pubDate && entry.pubDate !== "unknown-date") {
+		metaParts.push(`Published ${entry.pubDate}`)
+	}
+	const statusSummary = formatListeningStatusSummary(entry)
+	if (statusSummary) {
+		metaParts.push(statusSummary)
+	}
+	if (metaParts.length === 0) {
+		return [titleLine]
+	}
+	const metaWidth = Math.max((maxWidth || 0) - 4, 16)
+	const metaLine = `    ${truncateForDisplay(metaParts.join(" • "), metaWidth)}`
+	return [titleLine, metaLine]
 }
 
 function buildFallbackMetadata({ showSlug, rawEpisodeTitle, dateSegment, episodeSlug }) {
@@ -811,11 +905,36 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 			process.stdin.setRawMode(true)
 		}
 		let resolved = false
+		const basePageSize = Math.max(parsePositiveInteger(pageSize) || DEFAULT_PICK_PAGE_SIZE, 1)
+		let resolvedPageSize = basePageSize
 		const state = {
 			cursor: 0,
 			currentPage: 1,
 			commandBuffer: "",
 			statusMessage: null,
+		}
+		const getTerminalRows = () => {
+			if (typeof process.stdout.rows === "number" && process.stdout.rows > 0) {
+				return process.stdout.rows
+			}
+			return null
+		}
+		const computeResolvedPageSize = () => {
+			const rows = getTerminalRows()
+			if (!rows) {
+				return basePageSize
+			}
+			const reservedLines = 7
+			const linesPerEntry = 2
+			const available = rows - reservedLines
+			if (available <= 0) {
+				return 1
+			}
+			const capacity = Math.floor(available / linesPerEntry)
+			if (!Number.isFinite(capacity) || capacity < 1) {
+				return 1
+			}
+			return Math.max(1, Math.min(basePageSize, capacity))
 		}
 		const cleanup = (result) => {
 			if (resolved) {
@@ -844,67 +963,97 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 		}
 		const render = () => {
 			clampCursor()
+			const nextPageSize = computeResolvedPageSize()
+			if (nextPageSize !== resolvedPageSize) {
+				resolvedPageSize = nextPageSize
+				state.currentPage = Math.floor(state.cursor / resolvedPageSize) + 1
+			}
 			const totalCount = entries.length
-			const totalPages = Math.max(Math.ceil(totalCount / pageSize), 1)
+			const totalPages = Math.max(Math.ceil(totalCount / resolvedPageSize), 1)
 			if (state.currentPage < 1) {
 				state.currentPage = 1
 			}
 			if (state.currentPage > totalPages) {
 				state.currentPage = totalPages
 			}
-			const expectedPage = Math.floor(state.cursor / pageSize) + 1
+			const expectedPage = Math.floor(state.cursor / resolvedPageSize) + 1
 			if (expectedPage !== state.currentPage) {
 				state.currentPage = expectedPage
 			}
-			const pagination = paginateEntries(entries, state.currentPage, pageSize)
+			const pagination = paginateEntries(entries, state.currentPage, resolvedPageSize)
 			const { items, page, total, limit } = pagination
 			let pageCount = pagination.totalPages || 1
 			if (pageCount <= 0) {
 				pageCount = 1
 			}
 			const startIndex = page > 0 ? (page - 1) * limit : 0
+			const terminalWidth =
+				typeof process.stdout.columns === "number" && process.stdout.columns > 0
+					? process.stdout.columns
+					: 80
+			const indent = "  "
+			const usableWidth = Math.max(terminalWidth - indent.length, 40)
+			const indexWidth = Math.max(
+				String(Math.max(total, entries.length, resolvedPageSize) || 0).length,
+				2,
+			)
 			const lines = []
-			lines.push(buildListLogHeaderLine())
-			items.forEach((entry, index) => {
-				const globalIndex = startIndex + index
-				const pointer = state.cursor === globalIndex ? "➤" : " "
-				const label = formatListLogLine({ index: globalIndex + 1, entry })
-				lines.push(`${pointer} ${label}`)
-			})
+			lines.push(`${indent}Pick a transcript to copy`)
+			const dividerWidth = Math.min(usableWidth, 48)
+			lines.push(`${indent}${"-".repeat(dividerWidth)}`)
 			if (items.length === 0) {
-				lines.push("[INFO] No entries on this page.")
+				lines.push("")
+				lines.push(`${indent}[INFO] No entries on this page.`)
+			} else {
+				lines.push("")
+				items.forEach((entry, index) => {
+					const globalIndex = startIndex + index
+					const entryLines = buildPickerEntryLines({
+						entry,
+						displayIndex: globalIndex + 1,
+						isActive: state.cursor === globalIndex,
+						indexWidth,
+						maxWidth: usableWidth,
+					})
+					entryLines.forEach((line) => {
+						lines.push(`${indent}${line}`)
+					})
+				})
 			}
-			const summaryParts = [`page ${page}/${pageCount}`, `total ${total}`]
+			lines.push("")
+			const summaryParts = [`Page ${page}/${pageCount}`, `Total ${total}`]
 			if (status && status !== "all") {
-				summaryParts.push(`status=${status}`)
+				summaryParts.push(`Filter ${status}`)
 			}
-			const commandHint = state.commandBuffer ? `  typing: ${state.commandBuffer}` : ""
-			lines.push("")
-			lines.push(`📄 [SELECT] ${summaryParts.join(" | ")}`)
-			lines.push(`↑/↓ move  ←/→ page  Enter choose  n/p page  q quit${commandHint}`)
+			const typingLabel = state.commandBuffer ? ` | typing ${state.commandBuffer}` : ""
+			lines.push(`${indent}${summaryParts.join(" | ")}${typingLabel}`)
+			lines.push(
+				`${indent}↑/↓ move  ←/→ page  n/p page  digits jump  Enter copy  q quit`,
+			)
 			if (state.statusMessage) {
-				lines.push(state.statusMessage)
+				lines.push("")
+				lines.push(`${indent}${state.statusMessage}`)
 			}
 			lines.push("")
-			rl.output.write("\u001B[2J\u001B[0f" + lines.join("\n"))
+			rl.output.write("\u001B[2J\u001B[H" + lines.join("\n"))
 		}
 		const moveCursor = (delta) => {
 			state.cursor += delta
 			clampCursor()
-			const nextPage = Math.floor(state.cursor / pageSize) + 1
+			const nextPage = Math.floor(state.cursor / resolvedPageSize) + 1
 			if (nextPage !== state.currentPage) {
 				state.currentPage = nextPage
 			}
 		}
 		const movePage = (delta) => {
-			const totalPages = Math.max(Math.ceil(entries.length / pageSize), 1)
+			const totalPages = Math.max(Math.ceil(entries.length / resolvedPageSize), 1)
 			const nextPage = Math.min(Math.max(state.currentPage + delta, 1), totalPages)
 			if (nextPage === state.currentPage) {
 				state.statusMessage = delta > 0 ? "[INFO] Already at the last page." : "[INFO] Already at the first page."
 				return
 			}
 			state.currentPage = nextPage
-			state.cursor = Math.min((state.currentPage - 1) * pageSize, entries.length - 1)
+			state.cursor = Math.min((state.currentPage - 1) * resolvedPageSize, entries.length - 1)
 		}
 		const selectIndex = (index) => {
 			if (index < 0 || index >= entries.length) {
@@ -1186,7 +1335,7 @@ function filterCatalogEntries(entries, status) {
 	return entries.filter((entry) => {
 		const state = normalizePlayState(entry.playState)
 		if (status === "unplayed") {
-			return state === "unplayed"
+			return state === "unplayed" || state === "inProgress"
 		}
 		if (status === "played") {
 			return state === "played"
@@ -1537,6 +1686,16 @@ async function main() {
 	switch (command) {
 		case "sync":
 			await handleSyncCommand(options)
+			if (options && options.launchPickerAfterSync) {
+				if (!process.stdin.isTTY || !process.stdout.isTTY) {
+					console.log("[INFO] Sync complete. Run `transcripts` from an interactive terminal to browse.")
+				} else {
+					console.log("")
+					console.log("[INFO] Sync complete. Opening picker...")
+					const pickDefaults = parsePickOptions([])
+					await handlePickCommand(pickDefaults)
+				}
+			}
 			return
 		case "list":
 			await handleListCommand(options)
