@@ -84,9 +84,31 @@ function getStatusInfo(playState) {
 }
 
 function parseCliArguments(argv) {
-	const args = Array.isArray(argv) ? argv.slice() : []
+	const rawArgs = Array.isArray(argv) ? argv.slice() : []
+	const args = []
+	let flaggedCommand = null
+	rawArgs.forEach((arg) => {
+		if (arg === "--sync") {
+			flaggedCommand = "sync"
+			return
+		}
+		if (arg === "--pick") {
+			flaggedCommand = flaggedCommand || "pick"
+			return
+		}
+		args.push(arg)
+	})
+	if (flaggedCommand) {
+		return {
+			command: flaggedCommand,
+			options: parseCommandOptions(flaggedCommand, args),
+		}
+	}
 	if (args.length === 0) {
-		return { command: "sync", options: parseSyncOptions([]) }
+		return { command: "pick", options: parsePickOptions([]) }
+	}
+	if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
+		return { command: "help", options: parseHelpOptions([]) }
 	}
 	const first = args[0]
 	if (first && !first.startsWith("-")) {
@@ -104,7 +126,7 @@ function parseCliArguments(argv) {
 			}
 		}
 	}
-	return { command: "sync", options: parseSyncOptions(args) }
+	return { command: "pick", options: parsePickOptions(args) }
 }
 
 function parseCommandOptions(command, args) {
@@ -633,7 +655,7 @@ async function handleListCommand(options) {
 	const manifest = loadListeningStatusManifest(transcriptsDir)
 	const catalogEntries = buildCatalogEntries(manifest)
 	if (!catalogEntries || catalogEntries.length === 0) {
-		console.log("[INFO] No transcripts found. Try running `transcripts sync` first.")
+		console.log("[INFO] No transcripts found. Try running `transcripts --sync` first.")
 		return
 	}
 	const sortedEntries = catalogEntries.slice().sort(compareCatalogEntriesDesc)
@@ -690,7 +712,7 @@ async function handleCopyCommand(options) {
 	const manifest = loadListeningStatusManifest(transcriptsDir)
 	const catalogEntries = buildCatalogEntries(manifest)
 	if (!catalogEntries || catalogEntries.length === 0) {
-		throw new Error("No transcripts indexed. Run `transcripts sync` first.")
+		throw new Error("No transcripts indexed. Run `transcripts --sync` first.")
 	}
 	const target = findCatalogEntry(catalogEntries, safeOptions.key)
 	if (!target) {
@@ -736,7 +758,7 @@ async function handlePickCommand(options) {
 	const manifest = loadListeningStatusManifest(transcriptsDir)
 	const catalogEntries = buildCatalogEntries(manifest)
 	if (!catalogEntries || catalogEntries.length === 0) {
-		console.log("[INFO] No transcripts found. Run `transcripts sync` first.")
+		console.log("[INFO] No transcripts found. Run `transcripts --sync` first.")
 		return
 	}
 	const sortedEntries = catalogEntries.slice().sort(compareCatalogEntriesDesc)
@@ -1006,14 +1028,15 @@ function handleHelpCommand(options) {
 	const topic = options && options.topic ? options.topic.toLowerCase() : "global"
 	switch (topic) {
 		case "sync":
-			console.log("Usage: transcripts sync [--no-timestamps]")
+			console.log("Usage: transcripts --sync [--no-timestamps]")
+			console.log("       transcripts sync [--no-timestamps]")
 			console.log("       transcripts sync <input.ttml> <output.md> [--no-timestamps]")
 			console.log("")
 			console.log("Options:")
 			console.log("  --no-timestamps    Omit timestamp markers in generated Markdown.")
 			console.log("  --timestamps       Include timestamp markers (default).")
 			console.log("")
-			console.log("Without arguments, sync scans the TTML cache and exports Markdown for every transcript.")
+			console.log("Use --sync without additional arguments to scan the TTML cache and export every transcript as Markdown.")
 			return
 		case "list":
 			console.log("Usage: transcripts list [--status <state>] [--limit <n>] [--page <n>] [--json]")
@@ -1496,11 +1519,12 @@ async function handleBatch({ includeTimestamps }) {
 
 function printUsage() {
 	console.log("Usage:")
-	console.log("  transcripts sync [--no-timestamps]")
+	console.log("  transcripts [--status <state>] [--page-size <n>]")
+	console.log("  transcripts pick [--status <state>] [--page-size <n>]")
+	console.log("  transcripts --sync [--no-timestamps]")
 	console.log("  transcripts sync <input.ttml> <output.md> [--no-timestamps]")
 	console.log("  transcripts list [--status <state>] [--limit <n>] [--page <n>] [--json]")
 	console.log("  transcripts copy <identifier|relativePath> [--print]")
-	console.log("  transcripts pick [--status <state>] [--page-size <n>]")
 	console.log("")
 	console.log("Run transcripts help <command> for command-specific options.")
 }
@@ -1508,7 +1532,7 @@ function printUsage() {
 async function main() {
 	ensureTranscriptsDirectory()
 	const parsed = parseCliArguments(process.argv.slice(2))
-	const command = parsed.command || "sync"
+	const command = parsed.command || "pick"
 	const options = parsed.options || {}
 	switch (command) {
 		case "sync":

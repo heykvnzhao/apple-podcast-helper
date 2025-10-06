@@ -25,31 +25,69 @@ pnpm install
 
 ## Usage
 
-The script supports batch export of everything in the Podcasts cache or processing a single `.ttml` file.
+The tool now ships with a small CLI so you can sync, browse, and copy transcripts without remembering long `node` invocations.
 
-### Batch mode
+### Quick start
 
 ```bash
-node extract-transcripts.js [--no-timestamps]
+pnpm install
+```
+
+Run the CLI from the project root with either `node` or the provided script shortcut:
+
+```bash
+node extract-transcripts.js             # interactive picker (default)
+node extract-transcripts.js --sync      # batch export with timestamps
+node extract-transcripts.js --sync --no-timestamps
+node extract-transcripts.js list --status unplayed --limit 20
+node extract-transcripts.js pick --status unplayed --page-size 20
+node extract-transcripts.js copy the-vergecast/the-vergecast_2025-10-05_version-history-hove.md
+
+# or
+pnpm run transcripts -- list --status unplayed --limit 20
+```
+
+If you want a short alias such as `apd`, add it to your shell configuration and point it at `node /path/to/repo/extract-transcripts.js` with your preferred defaults.
+
+### `sync` – export transcripts
+
+```bash
+node extract-transcripts.js --sync [--no-timestamps]
 ```
 
 - Recursively scans the TTML cache, converts each transcript to Markdown, and writes files to `./transcripts/`.
 - Timestamps are included by default; pass `--no-timestamps` if you want raw transcript text.
-- Filenames follow `podcast-show-name_YYYY-MM-DD_episode-title-up-to-20-chars.md`.
-- Re-running keeps the folder tidy: any legacy `.txt` exports get upgraded to `.md` automatically.
+- Filenames follow `podcast-show-name_YYYY-MM-DD_episode-title-up-to-20-chars.md` and existing `.txt` exports are upgraded automatically.
+- Earlier releases defaulted to batch export; now you must pass `--sync` (or the explicit `sync` subcommand) when you want to regenerate Markdown.
 
-### Single-file mode
+### `list` – browse the manifest
 
 ```bash
-node extract-transcripts.js path/to/input.ttml path/to/output.md [--no-timestamps]
+node extract-transcripts.js list [--status <played|unplayed|in-progress|all>] [--limit <n>] [--page <n>] [--json]
 ```
 
-- Useful if you want to experiment with one transcript outside the cache.
-- You provide the exact output filename in this mode; the script does not rename it.
+- Lists manifest entries sorted newest-first. The default view prints a table with numbered rows so you can grab a path or identifier quickly.
+- Filter by listening state (e.g. `--status unplayed`) and paginate through batches of 10–20 episodes while you work.
+- Add `--json` to emit the current page as structured data.
 
-### Optional flags
+### `copy` – send Markdown to the clipboard
 
-- `--no-timestamps` – disable `[HH:MM:SS]` markers when you want plain paragraphs.
+```bash
+node extract-transcripts.js copy <identifier|relativePath> [--print]
+```
+
+- Accepts either a manifest identifier or the relative Markdown path under `transcripts/`.
+- If the macOS clipboard command (`pbcopy`) is unavailable the CLI logs a warning and, when `--print` is supplied, streams the Markdown to stdout so you can copy it manually.
+
+### `pick` – interactive chooser
+
+```bash
+node extract-transcripts.js pick [--status <state>] [--page-size <n>]
+```
+
+- Opens a simple pager that shows the newest episodes in batches (default 20 per page).
+- Choose a number to copy that transcript to your clipboard. If clipboard access fails you can fall back to printing the full Markdown in place.
+- Run `node extract-transcripts.js` with no arguments to launch the picker immediately.
 
 ### Listening status metadata & manifest
 
@@ -63,6 +101,7 @@ node extract-transcripts.js path/to/input.ttml path/to/output.md [--no-timestamp
 - If you see `TTML directory not found`, double-check that transcripts exist locally and that you are running on macOS under the same user account as the Podcasts app.
 - Metadata comes from `MTLibrary.sqlite` in the Podcasts container. If the script cannot read it, filenames fall back to `unknown-show_unknown-date_*` and listening status will be omitted. Ensure the Podcasts app is closed and that the database path exists.
 - The default `transcripts/` directory is git-ignored; feel free to delete or relocate it between runs.
+- Clipboard access uses the platform utilities (`pbcopy` on macOS). If those tools are missing or sandboxed the CLI will warn and point you at the Markdown file so you can copy it manually.
 
 ## Next steps
 
