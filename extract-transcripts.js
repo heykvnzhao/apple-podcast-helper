@@ -20,6 +20,25 @@ async function main() {
 	const parsed = parseCliArguments(process.argv.slice(2))
 	const command = parsed.command || "select"
 	const options = parsed.options || {}
+	const skipAutoSync = Boolean(parsed.skipAutoSync)
+	const shouldAutoSync =
+		!skipAutoSync &&
+		command !== "sync" &&
+		command !== "help" &&
+		!options.help
+
+	if (shouldAutoSync) {
+		const interactiveOutput = Boolean(process.stdout.isTTY && process.stderr && process.stderr.isTTY)
+		await runSyncCommand({
+			mode: "batch",
+			includeTimestamps: true,
+			showFilters: [],
+			stationFilters: [],
+			errors: [],
+			warnings: [],
+			interactiveOutput,
+		})
+	}
 
 	switch (command) {
 		case "sync":
@@ -59,4 +78,3 @@ main().catch((error) => {
 	console.error(message)
 	process.exit(1)
 })
-

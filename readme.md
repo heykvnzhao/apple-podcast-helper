@@ -36,8 +36,9 @@ pnpm install
 Run the CLI from the project root with either `node` or the provided script shortcut:
 
 ```bash
-node extract-transcripts.js             # interactive picker (default)
-node extract-transcripts.js --sync      # batch export with timestamps
+node extract-transcripts.js             # auto-sync then interactive picker (default)
+node extract-transcripts.js --no-sync   # skip sync and launch the picker with existing files
+node extract-transcripts.js --sync      # batch export only (timestamps on)
 node extract-transcripts.js --sync --no-timestamps
 node extract-transcripts.js list --status unplayed --limit 20
 node extract-transcripts.js pick --status unplayed --page-size 20
@@ -60,7 +61,7 @@ node extract-transcripts.js --sync [--no-timestamps]
 - Use `--show "<query>"` to limit exports to shows whose titles fuzzy-match the query. Combine multiple `--show` flags to include several podcasts in one pass.
 - Use `--station "<query>"` to restrict exports to shows from your custom Stations (e.g. `--station "Daily"`).
 - Filenames follow `podcast-show-name_YYYY-MM-DD_episode-title-up-to-20-chars.md` and existing `.txt` exports are upgraded automatically.
-- Earlier releases defaulted to batch export; now you must pass `--sync` (or the explicit `sync` subcommand) when you want to regenerate Markdown.
+- The CLI runs this sync automatically before other commands; use `--sync` for a dedicated export or `--no-sync` to skip the refresh.
 
 ### `list` – browse the manifest
 
@@ -69,6 +70,7 @@ node extract-transcripts.js list [--status <played|unplayed|in-progress|all>] [-
 ```
 
 - Lists manifest entries sorted newest-first. The default view prints a table with numbered rows so you can grab a path or identifier quickly.
+- Automatically refreshes the manifest before listing; pass `--no-sync` to skip the update step.
 - Filter by listening state (e.g. `--status unplayed`) and paginate through batches of 10–20 episodes while you work.
 - Add `--show "<query>"` or `--station "<query>"` when you only care about specific podcasts or Stations; fuzzy matching handles partial titles.
 - Add `--json` to emit the current page as structured data.
@@ -81,6 +83,7 @@ node extract-transcripts.js copy <identifier|relativePath> [--print]
 
 - Accepts either a manifest identifier or the relative Markdown path under `transcripts/`.
 - If the macOS clipboard command (`pbcopy`) is unavailable the CLI logs a warning and, when `--print` is supplied, streams the Markdown to stdout so you can copy it manually.
+- Prepend `--no-sync` when you only want to copy existing files without refreshing the cache (e.g. `node extract-transcripts.js --no-sync copy <path>`).
 
 ### `pick` – interactive chooser
 
@@ -91,7 +94,7 @@ node extract-transcripts.js pick [--status <state>] [--page-size <n>]
 - Opens a simple pager that shows the newest episodes in batches (default 20 per page).
 - Combine `--show "<query>"` or `--station "<query>"` with the picker to narrow the interactive menu before browsing.
 - Choose a number to copy that transcript to your clipboard. If clipboard access fails you can fall back to printing the full Markdown in place.
-- Run `node extract-transcripts.js` with no arguments to launch the picker immediately.
+- Run `node extract-transcripts.js` with no arguments to launch the picker immediately; add `--no-sync` when you only want to browse existing exports.
 
 ### Listening status metadata & manifest
 
