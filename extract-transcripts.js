@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { ensureTranscriptsDirectory } = require("./lib/config")
+const { ensureTranscriptsDirectory } = require("./lib/app-config")
 const { parseCliArguments, parseSelectOptions } = require("./lib/cli/parse-cli-arguments")
 const { printUsage, runHelpCommand } = require("./lib/cli/help")
 const { runSyncCommand } = require("./lib/commands/sync")
