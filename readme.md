@@ -23,6 +23,16 @@ Apple Podcast Helper turns the transcripts already cached by the Apple Podcasts 
    # or: npm install
    ```
 
+### Optional: Enable Gemini summaries
+
+Create a `.env` file at the project root with your Gemini API key to enable automatic episode summaries:
+
+```bash
+echo "GEMINI_API_KEY=your-api-key" >> .env
+```
+
+When the key is present, the `copy` command and interactive selector keep copying transcripts to your clipboard as before and additionally stream a structured summary generated with the prompt in `prompts/podcasts-summarizer.md`. The summary will be printed to the terminal; if the request fails or no key is configured, the CLI falls back to its original clipboard-only behavior.
+
 ## Quick Start
 
 Run the CLI with Node directly or through the provided `pnpm` scripts. All examples below assume you are inside the project directory.
