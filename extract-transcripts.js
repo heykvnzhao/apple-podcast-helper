@@ -903,10 +903,12 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 		readline.emitKeypressEvents(process.stdin, rl)
 		if (process.stdin.isTTY) {
 			process.stdin.setRawMode(true)
+			process.stdin.resume()
 		}
 		let resolved = false
 		const basePageSize = Math.max(parsePositiveInteger(pageSize) || DEFAULT_PICK_PAGE_SIZE, 1)
 		let resolvedPageSize = basePageSize
+		let cursorHidden = false
 		const state = {
 			cursor: 0,
 			currentPage: 1,
@@ -936,15 +938,30 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 			}
 			return Math.max(1, Math.min(basePageSize, capacity))
 		}
+		const hideCursor = () => {
+			if (!cursorHidden) {
+				rl.output.write("\u001B[?25l")
+				cursorHidden = true
+			}
+		}
+		const showCursor = () => {
+			if (cursorHidden) {
+				rl.output.write("\u001B[?25h")
+				cursorHidden = false
+			}
+		}
 		const cleanup = (result) => {
 			if (resolved) {
 				return
 			}
 			resolved = true
 			process.stdin.removeListener("keypress", handleKeypress)
+			process.stdout.removeListener("resize", handleResize)
 			if (process.stdin.isTTY) {
 				process.stdin.setRawMode(false)
+				process.stdin.pause()
 			}
+			showCursor()
 			rl.output.write("\n")
 			rl.close()
 			resolve(result)
@@ -1035,7 +1052,9 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 				lines.push(`${indent}${state.statusMessage}`)
 			}
 			lines.push("")
-			rl.output.write("\u001B[2J\u001B[H" + lines.join("\n"))
+			readline.cursorTo(rl.output, 0, 0)
+			readline.clearScreenDown(rl.output)
+			rl.output.write(lines.join("\n"))
 		}
 		const moveCursor = (delta) => {
 			state.cursor += delta
@@ -1169,6 +1188,13 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 		}
 		}
 		process.stdin.on("keypress", handleKeypress)
+		const handleResize = () => {
+			if (!resolved) {
+				render()
+			}
+		}
+		process.stdout.on("resize", handleResize)
+		hideCursor()
 		render()
 	})
 }
