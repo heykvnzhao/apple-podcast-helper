@@ -6,6 +6,7 @@
 		"sync": "node extract-transcripts.js sync"
 	},
 	"dependencies": {
+		"@google/genai": "^1.22.0",
 		"xml2js": "^0.6.2"
 	}
 }
