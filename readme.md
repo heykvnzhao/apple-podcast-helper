@@ -56,7 +56,7 @@ If you want a short alias such as `apd`, add it to your shell configuration and 
 node extract-transcripts.js --sync [--no-timestamps]
 ```
 
-- Recursively scans the TTML cache, converts each transcript to Markdown, and writes files to `./transcripts/`.
+- Recursively scans the TTML cache, converts each transcript to Markdown, and writes files to `transcripts/` in the project root.
 - Timestamps are included by default; pass `--no-timestamps` if you want raw transcript text.
 - Use `--show "<query>"` to limit exports to shows whose titles fuzzy-match the query. Combine multiple `--show` flags to include several podcasts in one pass.
 - Use `--station "<query>"` to restrict exports to shows from your custom Stations (e.g. `--station "Daily"`).
