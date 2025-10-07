@@ -107,3 +107,11 @@ The guest notes a trend where investors now prioritize cost structure, retention
 _“Your moat isn’t your model; it’s your data pipeline.”_ — 00:09:40
 
 _“Investors used to ask ‘what can your model do?’ Now they ask ‘how fast can it learn from your users?’”_ — 00:25:10
+
+### Closing Mentions
+
+**00:04:10–00:09:20 — Model differentiation is overrated.**
+Founders often believe their model’s novelty is their advantage, but the real moat lies in user distribution and embedded workflows. The guest argues that access to proprietary feedback loops and user context data drives long-term defensibility more than raw model quality.
+
+**00:16:00–00:19:30 — Hire domain experts early.**
+Domain-specific expertise grounds the product in real user needs. Founders who integrate subject-matter experts into model training avoid “demo trap” features that impress investors but fail in production. This reduces wasted cycles and improves adoption metrics.
