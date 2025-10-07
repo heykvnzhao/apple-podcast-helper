@@ -31,7 +31,7 @@ Create a `.env` file at the project root with your Gemini API key to enable auto
 echo "GEMINI_API_KEY=your-api-key" >> .env
 ```
 
-When the key is present, the `copy` command and interactive selector keep copying transcripts to your clipboard as before and additionally stream a structured summary generated with the prompt in `prompts/podcasts-summarizer.md`. The summary will be printed to the terminal; if the request fails or no key is configured, the CLI falls back to its original clipboard-only behavior.
+When the key is present, the `copy` command and interactive selector keep copying transcripts to your clipboard as before and additionally stream a structured summary generated with the prompt in `prompts/podcasts-summarizer.md`. You'll see a spinner while the LLM works, followed by a live, nicely formatted Markdown summary in the terminal. If the request fails or no key is configured, the CLI falls back to its original clipboard-only behavior.
 
 ## Quick Start
 
