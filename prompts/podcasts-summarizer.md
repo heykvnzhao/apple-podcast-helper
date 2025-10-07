@@ -81,14 +81,14 @@ This episode explores the challenges of scaling generative AI startups, focusing
 
 ### Key Takeaways
 
-- **00:04:10–00:09:20 — Model differentiation is overrated.**
-  Founders often believe their model’s novelty is their advantage, but the real moat lies in user distribution and embedded workflows. The guest argues that access to proprietary feedback loops and user context data drives long-term defensibility more than raw model quality.
+**00:04:10–00:09:20 — Model differentiation is overrated.**
+Founders often believe their model’s novelty is their advantage, but the real moat lies in user distribution and embedded workflows. The guest argues that access to proprietary feedback loops and user context data drives long-term defensibility more than raw model quality.
 
-- **00:16:00–00:19:30 — Hire domain experts early.**
-  Domain-specific expertise grounds the product in real user needs. Founders who integrate subject-matter experts into model training avoid “demo trap” features that impress investors but fail in production. This reduces wasted cycles and improves adoption metrics.
+**00:16:00–00:19:30 — Hire domain experts early.**
+Domain-specific expertise grounds the product in real user needs. Founders who integrate subject-matter experts into model training avoid “demo trap” features that impress investors but fail in production. This reduces wasted cycles and improves adoption metrics.
 
-- **00:25:45–00:29:00 — Investor focus is shifting toward defensibility metrics.**
-  The guest notes a trend where investors now prioritize cost structure, retention signals, and differentiated data pipelines. “Defensibility decks” are replacing glossy demo reels as investors demand long-term visibility into model improvement curves.
+**00:25:45–00:29:00 — Investor focus is shifting toward defensibility metrics.**
+The guest notes a trend where investors now prioritize cost structure, retention signals, and differentiated data pipelines. “Defensibility decks” are replacing glossy demo reels as investors demand long-term visibility into model improvement curves.
 
 ---
 
@@ -104,9 +104,6 @@ This episode explores the challenges of scaling generative AI startups, focusing
 
 ### Notable Quotes or Stats
 
-- _“Your moat isn’t your model; it’s your data pipeline.”_ — 00:09:40
-- _“Investors used to ask ‘what can your model do?’ Now they ask ‘how fast can it learn from your users?’”_ — 00:25:10
+_“Your moat isn’t your model; it’s your data pipeline.”_ — 00:09:40
 
----
-
-Would you like me to also generate a **short “automation-safe” version** of this (single-paragraph version for command-line or API prompts) that still enforces detailed key takeaways but strips human-facing formatting?
+_“Investors used to ask ‘what can your model do?’ Now they ask ‘how fast can it learn from your users?’”_ — 00:25:10
