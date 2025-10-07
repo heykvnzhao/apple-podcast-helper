@@ -28,7 +28,9 @@ async function main() {
 		!options.help
 
 	if (shouldAutoSync) {
-		const interactiveOutput = Boolean(process.stdout.isTTY && process.stderr && process.stderr.isTTY)
+		const interactiveOutput = Boolean(
+			(process.stdout && process.stdout.isTTY) || (process.stderr && process.stderr.isTTY),
+		)
 		await runSyncCommand({
 			mode: "batch",
 			includeTimestamps: true,
