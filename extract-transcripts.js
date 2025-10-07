@@ -41,9 +41,9 @@ const ttmlCacheDir = path.join(
 	"Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Library/Cache/Assets/TTML",
 )
 
-const CLI_COMMANDS = new Set(["sync", "list", "copy", "pick", "help"])
+const CLI_COMMANDS = new Set(["sync", "list", "copy", "select", "help"])
 const COMMAND_ALIASES = {
-	interactive: "pick",
+	interactive: "select",
 }
 
 const LISTING_STATUS_METADATA = {
@@ -53,7 +53,7 @@ const LISTING_STATUS_METADATA = {
 }
 
 const DEFAULT_LIST_LIMIT = 20
-const DEFAULT_PICK_PAGE_SIZE = 20
+const DEFAULT_SELECT_PAGE_SIZE = 20
 
 function ensureTranscriptsDirectory() {
 	if (!fs.existsSync(transcriptsDir)) {
@@ -94,8 +94,8 @@ function parseCliArguments(argv) {
 			syncFlagEncountered = true
 			return
 		}
-		if (arg === "--pick") {
-			flaggedCommand = flaggedCommand || "pick"
+		if (arg === "--select") {
+			flaggedCommand = flaggedCommand || "select"
 			return
 		}
 		args.push(arg)
@@ -103,7 +103,7 @@ function parseCliArguments(argv) {
 	if (flaggedCommand) {
 		const options = parseCommandOptions(flaggedCommand, args)
 		if (syncFlagEncountered && options && typeof options === "object") {
-			options.launchPickerAfterSync = true
+			options.launchSelectorAfterSync = true
 		}
 		return {
 			command: flaggedCommand,
@@ -111,7 +111,7 @@ function parseCliArguments(argv) {
 		}
 	}
 	if (args.length === 0) {
-		return { command: "pick", options: parsePickOptions([]) }
+		return { command: "select", options: parseSelectOptions([]) }
 	}
 	if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
 		return { command: "help", options: parseHelpOptions([]) }
@@ -132,7 +132,7 @@ function parseCliArguments(argv) {
 			}
 		}
 	}
-	return { command: "pick", options: parsePickOptions(args) }
+	return { command: "select", options: parseSelectOptions(args) }
 }
 
 function parseCommandOptions(command, args) {
@@ -143,8 +143,8 @@ function parseCommandOptions(command, args) {
 			return parseListOptions(args)
 		case "copy":
 			return parseCopyOptions(args)
-		case "pick":
-			return parsePickOptions(args)
+		case "select":
+			return parseSelectOptions(args)
 		default:
 			return { help: true, errors: [`Unknown command: ${command}`] }
 	}
@@ -322,10 +322,10 @@ function parseCopyOptions(args) {
 	return options
 }
 
-function parsePickOptions(args) {
+function parseSelectOptions(args) {
 	const options = {
 		status: "unplayed",
-		pageSize: DEFAULT_PICK_PAGE_SIZE,
+		pageSize: DEFAULT_SELECT_PAGE_SIZE,
 		help: false,
 		errors: [],
 		warnings: [],
@@ -669,7 +669,7 @@ function formatListLogLine({ index, entry }) {
 	return `${status.icon} │ ${cells.join(" │ ")}`
 }
 
-function buildPickerEntryLines({ entry, displayIndex, isActive, indexWidth, maxWidth }) {
+function buildSelectorEntryLines({ entry, displayIndex, isActive, indexWidth, maxWidth }) {
 	const pointer = isActive ? ">" : " "
 	const safeIndexWidth = Math.max(indexWidth || 0, 2)
 	const label = String(displayIndex || "").padStart(safeIndexWidth, " ")
@@ -837,17 +837,17 @@ async function handleCopyCommand(options) {
 	}
 }
 
-async function handlePickCommand(options) {
+async function handleSelectCommand(options) {
 	const safeOptions = options || {}
 	if (safeOptions.help) {
-		handleHelpCommand({ topic: "pick" })
+		handleHelpCommand({ topic: "select" })
 		return
 	}
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
 		throw new Error("Interactive mode requires an interactive terminal (TTY).")
 	}
 	if (!reportOptionMessages(safeOptions)) {
-		throw new Error("Unable to start interactive picker. Resolve the errors above and retry.")
+		throw new Error("Unable to start interactive selection. Resolve the errors above and retry.")
 	}
 	const manifest = loadListeningStatusManifest(transcriptsDir)
 	const catalogEntries = buildCatalogEntries(manifest)
@@ -862,8 +862,8 @@ async function handlePickCommand(options) {
 		console.log(`[INFO] No transcripts available${statusLabel}.`)
 		return
 	}
-	const pageSize = Math.max(parsePositiveInteger(safeOptions.pageSize) || DEFAULT_PICK_PAGE_SIZE, 1)
-	const selectedEntry = await runInteractivePicker({
+	const pageSize = Math.max(parsePositiveInteger(safeOptions.pageSize) || DEFAULT_SELECT_PAGE_SIZE, 1)
+	const selectedEntry = await runInteractiveSelector({
 		entries: filteredEntries,
 		pageSize,
 		status: safeOptions.status,
@@ -897,7 +897,7 @@ async function handlePickCommand(options) {
 	}
 }
 
-async function runInteractivePicker({ entries, pageSize, status }) {
+async function runInteractiveSelector({ entries, pageSize, status }) {
 	return new Promise((resolve) => {
 		const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 		readline.emitKeypressEvents(process.stdin, rl)
@@ -906,7 +906,7 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 			process.stdin.resume()
 		}
 		let resolved = false
-		const basePageSize = Math.max(parsePositiveInteger(pageSize) || DEFAULT_PICK_PAGE_SIZE, 1)
+		const basePageSize = Math.max(parsePositiveInteger(pageSize) || DEFAULT_SELECT_PAGE_SIZE, 1)
 		let resolvedPageSize = basePageSize
 		let cursorHidden = false
 		const state = {
@@ -1015,7 +1015,7 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 				2,
 			)
 			const lines = []
-			lines.push(`${indent}Pick a transcript to copy`)
+			lines.push(`${indent}Select a transcript to copy`)
 			const dividerWidth = Math.min(usableWidth, 48)
 			lines.push(`${indent}${"-".repeat(dividerWidth)}`)
 			if (items.length === 0) {
@@ -1025,7 +1025,7 @@ async function runInteractivePicker({ entries, pageSize, status }) {
 				lines.push("")
 				items.forEach((entry, index) => {
 					const globalIndex = startIndex + index
-					const entryLines = buildPickerEntryLines({
+					const entryLines = buildSelectorEntryLines({
 						entry,
 						displayIndex: globalIndex + 1,
 						isActive: state.cursor === globalIndex,
@@ -1232,13 +1232,13 @@ function handleHelpCommand(options) {
 			console.log("Options:")
 			console.log("  --print            Also print the Markdown to stdout after copying.")
 			return
-		case "pick":
+		case "select":
 		case "interactive":
-			console.log("Usage: transcripts pick [--status <state>] [--page-size <n>]")
+			console.log("Usage: transcripts select [--status <state>] [--page-size <n>]")
 			console.log("")
 			console.log("Options:")
 			console.log("  --status <state>   Filter by play state before prompting (default: unplayed).")
-			console.log("  --page-size <n>    Number of rows per page in the picker (default: 20).")
+			console.log("  --page-size <n>    Number of rows per page in the selector (default: 20).")
 			console.log("")
 			console.log("Interactive mode lets you browse transcripts and copy one to the clipboard.")
 			return
@@ -1695,7 +1695,7 @@ async function handleBatch({ includeTimestamps }) {
 function printUsage() {
 	console.log("Usage:")
 	console.log("  transcripts [--status <state>] [--page-size <n>]")
-	console.log("  transcripts pick [--status <state>] [--page-size <n>]")
+	console.log("  transcripts select [--status <state>] [--page-size <n>]")
 	console.log("  transcripts --sync [--no-timestamps]")
 	console.log("  transcripts sync <input.ttml> <output.md> [--no-timestamps]")
 	console.log("  transcripts list [--status <state>] [--limit <n>] [--page <n>] [--json]")
@@ -1707,19 +1707,19 @@ function printUsage() {
 async function main() {
 	ensureTranscriptsDirectory()
 	const parsed = parseCliArguments(process.argv.slice(2))
-	const command = parsed.command || "pick"
+	const command = parsed.command || "select"
 	const options = parsed.options || {}
 	switch (command) {
 		case "sync":
 			await handleSyncCommand(options)
-			if (options && options.launchPickerAfterSync) {
+			if (options && options.launchSelectorAfterSync) {
 				if (!process.stdin.isTTY || !process.stdout.isTTY) {
 					console.log("[INFO] Sync complete. Run `transcripts` from an interactive terminal to browse.")
 				} else {
 					console.log("")
-					console.log("[INFO] Sync complete. Opening picker...")
-					const pickDefaults = parsePickOptions([])
-					await handlePickCommand(pickDefaults)
+					console.log("[INFO] Sync complete. Opening selector...")
+					const selectDefaults = parseSelectOptions([])
+					await handleSelectCommand(selectDefaults)
 				}
 			}
 			return
@@ -1729,8 +1729,8 @@ async function main() {
 		case "copy":
 			await handleCopyCommand(options)
 			return
-		case "pick":
-			await handlePickCommand(options)
+		case "select":
+			await handleSelectCommand(options)
 			return
 		case "help":
 			handleHelpCommand(options)
