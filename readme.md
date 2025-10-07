@@ -57,6 +57,8 @@ node extract-transcripts.js --sync [--no-timestamps]
 
 - Recursively scans the TTML cache, converts each transcript to Markdown, and writes files to `./transcripts/`.
 - Timestamps are included by default; pass `--no-timestamps` if you want raw transcript text.
+- Use `--show "<query>"` to limit exports to shows whose titles fuzzy-match the query. Combine multiple `--show` flags to include several podcasts in one pass.
+- Use `--station "<query>"` to restrict exports to shows from your custom Stations (e.g. `--station "Daily"`).
 - Filenames follow `podcast-show-name_YYYY-MM-DD_episode-title-up-to-20-chars.md` and existing `.txt` exports are upgraded automatically.
 - Earlier releases defaulted to batch export; now you must pass `--sync` (or the explicit `sync` subcommand) when you want to regenerate Markdown.
 
@@ -68,6 +70,7 @@ node extract-transcripts.js list [--status <played|unplayed|in-progress|all>] [-
 
 - Lists manifest entries sorted newest-first. The default view prints a table with numbered rows so you can grab a path or identifier quickly.
 - Filter by listening state (e.g. `--status unplayed`) and paginate through batches of 10–20 episodes while you work.
+- Add `--show "<query>"` or `--station "<query>"` when you only care about specific podcasts or Stations; fuzzy matching handles partial titles.
 - Add `--json` to emit the current page as structured data.
 
 ### `copy` – send Markdown to the clipboard
@@ -86,6 +89,7 @@ node extract-transcripts.js pick [--status <state>] [--page-size <n>]
 ```
 
 - Opens a simple pager that shows the newest episodes in batches (default 20 per page).
+- Combine `--show "<query>"` or `--station "<query>"` with the picker to narrow the interactive menu before browsing.
 - Choose a number to copy that transcript to your clipboard. If clipboard access fails you can fall back to printing the full Markdown in place.
 - Run `node extract-transcripts.js` with no arguments to launch the picker immediately.
 

@@ -173,26 +173,54 @@ function parseSyncOptions(args) {
 		inputPath: null,
 		outputPath: null,
 		help: false,
+		showFilters: [],
+		stationFilters: [],
 		errors: [],
 		warnings: [],
 	}
 	const positional = []
 	const list = Array.isArray(args) ? args : []
-	list.forEach((arg) => {
-		if (arg === "--timestamps") {
+	for (let index = 0; index < list.length; index += 1) {
+		const rawArg = list[index]
+		if (rawArg === "--timestamps") {
 			options.includeTimestamps = true
-			return
+			continue
 		}
-		if (arg === "--no-timestamps") {
+		if (rawArg === "--no-timestamps") {
 			options.includeTimestamps = false
-			return
+			continue
 		}
-		if (arg === "--help" || arg === "-h") {
+		if (rawArg === "--help" || rawArg === "-h") {
 			options.help = true
-			return
+			continue
 		}
-		positional.push(arg)
-	})
+		const [flag, inlineValue] = splitFlagValue(rawArg)
+		if (flag === "--show") {
+			const value = inlineValue !== null ? inlineValue : list[index + 1]
+			if (inlineValue === null && value !== undefined) {
+				index += 1
+			}
+			if (value === undefined) {
+				options.errors.push("--show requires a value")
+				continue
+			}
+			addFilterValues(options.showFilters, value)
+			continue
+		}
+		if (flag === "--station") {
+			const value = inlineValue !== null ? inlineValue : list[index + 1]
+			if (inlineValue === null && value !== undefined) {
+				index += 1
+			}
+			if (value === undefined) {
+				options.errors.push("--station requires a value")
+				continue
+			}
+			addFilterValues(options.stationFilters, value)
+			continue
+		}
+		positional.push(rawArg)
+	}
 	if (positional.length === 0) {
 		options.mode = "batch"
 		return options
@@ -217,6 +245,8 @@ function parseListOptions(args) {
 		page: 1,
 		format: "table",
 		help: false,
+		showFilters: [],
+		stationFilters: [],
 		errors: [],
 		warnings: [],
 	}
@@ -287,6 +317,30 @@ function parseListOptions(args) {
 			options.format = "table"
 			continue
 		}
+		if (flag === "--show") {
+			const value = inlineValue !== null ? inlineValue : list[index + 1]
+			if (inlineValue === null && value !== undefined) {
+				index += 1
+			}
+			if (value === undefined) {
+				options.errors.push("--show requires a value")
+				continue
+			}
+			addFilterValues(options.showFilters, value)
+			continue
+		}
+		if (flag === "--station") {
+			const value = inlineValue !== null ? inlineValue : list[index + 1]
+			if (inlineValue === null && value !== undefined) {
+				index += 1
+			}
+			if (value === undefined) {
+				options.errors.push("--station requires a value")
+				continue
+			}
+			addFilterValues(options.stationFilters, value)
+			continue
+		}
 		options.warnings.push(`Unrecognized argument: ${rawArg}`)
 	}
 	return options
@@ -327,6 +381,8 @@ function parseSelectOptions(args) {
 		status: "unplayed",
 		pageSize: DEFAULT_SELECT_PAGE_SIZE,
 		help: false,
+		showFilters: [],
+		stationFilters: [],
 		errors: [],
 		warnings: [],
 	}
@@ -372,6 +428,30 @@ function parseSelectOptions(args) {
 			options.pageSize = parsed
 			continue
 		}
+		if (flag === "--show") {
+			const value = inlineValue !== null ? inlineValue : list[index + 1]
+			if (inlineValue === null && value !== undefined) {
+				index += 1
+			}
+			if (value === undefined) {
+				options.errors.push("--show requires a value")
+				continue
+			}
+			addFilterValues(options.showFilters, value)
+			continue
+		}
+		if (flag === "--station") {
+			const value = inlineValue !== null ? inlineValue : list[index + 1]
+			if (inlineValue === null && value !== undefined) {
+				index += 1
+			}
+			if (value === undefined) {
+				options.errors.push("--station requires a value")
+				continue
+			}
+			addFilterValues(options.stationFilters, value)
+			continue
+		}
 		const numericValue = parsePositiveInteger(rawArg)
 		if (numericValue !== null && !inlineValue && !rawArg.startsWith("-")) {
 			options.pageSize = numericValue
@@ -407,6 +487,129 @@ function parsePositiveInteger(value) {
 	return parsed
 }
 
+function parseFilterValues(rawValue) {
+	if (rawValue === undefined || rawValue === null) {
+		return []
+	}
+	return String(rawValue)
+		.split(",")
+		.map((item) => item.trim())
+		.filter((item) => item.length > 0)
+}
+
+function addFilterValues(target, rawValue) {
+	if (!Array.isArray(target)) {
+		return target
+	}
+	parseFilterValues(rawValue).forEach((value) => {
+		if (!target.includes(value)) {
+			target.push(value)
+		}
+	})
+	return target
+}
+
+function normalizeMatchValue(value) {
+	if (value === undefined || value === null) {
+		return ""
+	}
+	return String(value)
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, " ")
+		.trim()
+}
+
+function buildMatchCandidate(value) {
+	const normalized = normalizeMatchValue(value)
+	if (!normalized) {
+		return null
+	}
+	const collapsed = normalized.replace(/\s+/g, "")
+	const tokens = normalized.split(/\s+/).filter(Boolean)
+	const initials = tokens.map((token) => token[0]).join("")
+	return {
+		normalized,
+		collapsed,
+		tokens,
+		initials,
+	}
+}
+
+function createFuzzyMatcher(query) {
+	const candidate = buildMatchCandidate(query)
+	if (!candidate) {
+		return null
+	}
+	return (value) => {
+		const target = buildMatchCandidate(value)
+		if (!target) {
+			return false
+		}
+		if (candidate.normalized && target.normalized.includes(candidate.normalized)) {
+			return true
+		}
+		if (candidate.collapsed && target.collapsed.includes(candidate.collapsed)) {
+			return true
+		}
+		if (
+			candidate.tokens.length > 0 &&
+			candidate.tokens.every((token) => target.normalized.includes(token))
+		) {
+			return true
+		}
+		if (candidate.initials && target.initials.includes(candidate.initials)) {
+			return true
+		}
+		return false
+	}
+}
+
+function buildFuzzyMatchers(values) {
+	if (!Array.isArray(values) || values.length === 0) {
+		return []
+	}
+	return values
+		.map((value) => createFuzzyMatcher(value))
+		.filter((fn) => typeof fn === "function")
+}
+
+function collectMatchFields(...values) {
+	const results = []
+	const seen = new Set()
+	const addValue = (value) => {
+		if (value === undefined || value === null) {
+			return
+		}
+		const str = String(value).trim()
+		if (!str || seen.has(str)) {
+			return
+		}
+		seen.add(str)
+		results.push(str)
+	}
+	values.forEach((value) => {
+		if (Array.isArray(value)) {
+			value.forEach(addValue)
+			return
+		}
+		addValue(value)
+	})
+	return results
+}
+
+function matchesAnyField(matchers, fields) {
+	if (!Array.isArray(matchers) || matchers.length === 0) {
+		return true
+	}
+	const safeFields = collectMatchFields(fields)
+	if (safeFields.length === 0) {
+		return false
+	}
+	return matchers.some((matcher) => safeFields.some((field) => matcher(field)))
+}
+
 function normalizeStatusFilter(value) {
 	if (!value) {
 		return null
@@ -434,6 +637,62 @@ function normalizeStatusFilter(value) {
 		return "inProgress"
 	}
 	return null
+}
+
+function needsStationMetadata(options) {
+	if (!options || typeof options !== "object") {
+		return false
+	}
+	if (Array.isArray(options.stationFilters) && options.stationFilters.length > 0) {
+		return true
+	}
+	if (typeof options.station === "string" && options.station.trim()) {
+		return true
+	}
+	if (typeof options.stationQuery === "string" && options.stationQuery.trim()) {
+		return true
+	}
+	return false
+}
+
+function ensureStationMetadataForManifest(manifest, options) {
+	if (!manifest || !manifest.entries) {
+		return
+	}
+	if (!needsStationMetadata(options)) {
+		return
+	}
+	const missing = []
+	Object.values(manifest.entries).forEach((entry) => {
+		if (!entry || !entry.identifier) {
+			return
+		}
+		const metadata = entry.metadata || null
+		const hasStationList =
+			metadata &&
+			Array.isArray(metadata.stationTitles) &&
+			metadata.stationTitles.some((title) => title && title.trim())
+		if (!hasStationList) {
+			missing.push(entry.identifier)
+		}
+	})
+	if (missing.length === 0) {
+		return
+	}
+	const metadataMap = loadTranscriptMetadata(missing)
+	metadataMap.forEach((metadata, identifier) => {
+		if (!metadata || !manifest.entries[identifier]) {
+			return
+		}
+		const existing = manifest.entries[identifier].metadata || {}
+		manifest.entries[identifier].metadata = {
+			...metadata,
+			listeningStatus:
+				metadata.listeningStatus != null
+					? metadata.listeningStatus
+					: existing.listeningStatus || null,
+		}
+	})
 }
 
 function reportOptionMessages(options) {
@@ -705,6 +964,10 @@ function buildFallbackMetadata({ showSlug, rawEpisodeTitle, dateSegment, episode
 		pubDate: safeDateSegment,
 		showSlug: safeShowSlug,
 		episodeSlug: safeEpisodeSlug,
+		stationTitle: null,
+		stationSlug: null,
+		stationTitles: [],
+		stationSlugs: [],
 		baseFileName: `${safeShowSlug}_${safeDateSegment}_${safeEpisodeSlug}`,
 		episodeDescriptionHtml: "",
 		episodeDescriptionText: "",
@@ -731,7 +994,11 @@ async function handleSyncCommand(options) {
 		return
 	}
 	if (safeOptions.mode === "batch") {
-		await handleBatch({ includeTimestamps })
+		await handleBatch({
+			includeTimestamps,
+			showFilters: safeOptions.showFilters || [],
+			stationFilters: safeOptions.stationFilters || [],
+		})
 		return
 	}
 	throw new Error("Invalid sync arguments. Run `transcripts help sync` for details.")
@@ -747,33 +1014,41 @@ async function handleListCommand(options) {
 		throw new Error("Unable to list transcripts. Fix the errors above and retry.")
 	}
 	const manifest = loadListeningStatusManifest(transcriptsDir)
+	ensureStationMetadataForManifest(manifest, safeOptions)
 	const catalogEntries = buildCatalogEntries(manifest)
 	if (!catalogEntries || catalogEntries.length === 0) {
 		console.log("[INFO] No transcripts found. Try running `transcripts --sync` first.")
 		return
 	}
 	const sortedEntries = catalogEntries.slice().sort(compareCatalogEntriesDesc)
-	const filteredEntries = filterCatalogEntries(sortedEntries, safeOptions.status)
+	const filterConfig = buildEntryFilterConfig(safeOptions)
+	const filteredEntries = filterCatalogEntries(sortedEntries, filterConfig)
+	if (filteredEntries.length === 0) {
+		const summary = describeFilterSummary(filterConfig)
+		const suffix = summary ? ` matching filters (${summary})` : ""
+		console.log(`[INFO] No transcripts found${suffix}.`)
+		return
+	}
 	const pagination = paginateEntries(filteredEntries, safeOptions.page, safeOptions.limit)
 	const { items, page, totalPages, total, limit } = pagination
 	const format = safeOptions.format || "table"
 	if (format === "json") {
 		const payload = items.map((entry) => serializeCatalogEntry(entry))
 		const response = {
-			status: safeOptions.status || "all",
+			status: filterConfig.status || "all",
 			page,
 			limit,
 			total,
 			totalPages,
 			count: payload.length,
+			filters: {
+				status: filterConfig.status || "all",
+				show: filterConfig.showFilters,
+				station: filterConfig.stationFilters,
+			},
 			entries: payload,
 		}
 		console.log(JSON.stringify(response, null, 2))
-		return
-	}
-	if (filteredEntries.length === 0) {
-		const statusLabel = safeOptions.status && safeOptions.status !== "all" ? ` with status "${safeOptions.status}"` : ""
-		console.log(`[INFO] No transcripts found${statusLabel}.`)
 		return
 	}
 	printListLogHeader()
@@ -788,8 +1063,14 @@ async function handleListCommand(options) {
 	if (totalPages > 0) {
 		summaryParts.push(`page ${page}/${totalPages}`)
 	}
-	if (safeOptions.status && safeOptions.status !== "all") {
-		summaryParts.push(`status=${safeOptions.status}`)
+	if (filterConfig.status && filterConfig.status !== "all") {
+		summaryParts.push(`status=${filterConfig.status}`)
+	}
+	if (filterConfig.showFilters.length > 0) {
+		summaryParts.push(`show~${filterConfig.showFilters.join(" OR ")}`)
+	}
+	if (filterConfig.stationFilters.length > 0) {
+		summaryParts.push(`station~${filterConfig.stationFilters.join(" OR ")}`)
 	}
 	console.log(`📄 [LIST] ${summaryParts.join(" | ")}`)
 }
@@ -850,23 +1131,31 @@ async function handleSelectCommand(options) {
 		throw new Error("Unable to start interactive selection. Resolve the errors above and retry.")
 	}
 	const manifest = loadListeningStatusManifest(transcriptsDir)
+	ensureStationMetadataForManifest(manifest, safeOptions)
 	const catalogEntries = buildCatalogEntries(manifest)
 	if (!catalogEntries || catalogEntries.length === 0) {
 		console.log("[INFO] No transcripts found. Run `transcripts --sync` first.")
 		return
 	}
 	const sortedEntries = catalogEntries.slice().sort(compareCatalogEntriesDesc)
-	const filteredEntries = filterCatalogEntries(sortedEntries, safeOptions.status)
+	const filterConfig = buildEntryFilterConfig(safeOptions)
+	const filteredEntries = filterCatalogEntries(sortedEntries, filterConfig)
 	if (filteredEntries.length === 0) {
-		const statusLabel = safeOptions.status && safeOptions.status !== "all" ? ` with status "${safeOptions.status}"` : ""
-		console.log(`[INFO] No transcripts available${statusLabel}.`)
+		const summary = describeFilterSummary(filterConfig)
+		const suffix = summary ? ` matching filters (${summary})` : ""
+		console.log(`[INFO] No transcripts available${suffix}.`)
 		return
 	}
 	const pageSize = Math.max(parsePositiveInteger(safeOptions.pageSize) || DEFAULT_SELECT_PAGE_SIZE, 1)
 	const selectedEntry = await runInteractiveSelector({
 		entries: filteredEntries,
 		pageSize,
-		status: safeOptions.status,
+		status: filterConfig.status,
+		filters: {
+			status: filterConfig.status,
+			showFilters: filterConfig.showFilters,
+			stationFilters: filterConfig.stationFilters,
+		},
 	})
 	if (!selectedEntry) {
 		return
@@ -897,7 +1186,7 @@ async function handleSelectCommand(options) {
 	}
 }
 
-async function runInteractiveSelector({ entries, pageSize, status }) {
+async function runInteractiveSelector({ entries, pageSize, status, filters = null }) {
 	return new Promise((resolve) => {
 		const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 		readline.emitKeypressEvents(process.stdin, rl)
@@ -1018,11 +1307,14 @@ async function runInteractiveSelector({ entries, pageSize, status }) {
 			lines.push(`${indent}Select a transcript to copy`)
 			const dividerWidth = Math.min(usableWidth, 48)
 			lines.push(`${indent}${"-".repeat(dividerWidth)}`)
+			const filterSummaryText = filters ? describeFilterSummary(filters) : ""
+			if (filterSummaryText) {
+				lines.push(`${indent}[Filters] ${filterSummaryText}`)
+			}
+			lines.push("")
 			if (items.length === 0) {
-				lines.push("")
 				lines.push(`${indent}[INFO] No entries on this page.`)
 			} else {
-				lines.push("")
 				items.forEach((entry, index) => {
 					const globalIndex = startIndex + index
 					const entryLines = buildSelectorEntryLines({
@@ -1039,8 +1331,12 @@ async function runInteractiveSelector({ entries, pageSize, status }) {
 			}
 			lines.push("")
 			const summaryParts = [`Page ${page}/${pageCount}`, `Total ${total}`]
-			if (status && status !== "all") {
-				summaryParts.push(`Filter ${status}`)
+			const activeStatus =
+				filters && Object.prototype.hasOwnProperty.call(filters, "status")
+					? filters.status
+					: status
+			if (activeStatus && activeStatus !== "all") {
+				summaryParts.push(`status=${activeStatus}`)
 			}
 			const typingLabel = state.commandBuffer ? ` | typing ${state.commandBuffer}` : ""
 			lines.push(`${indent}${summaryParts.join(" | ")}${typingLabel}`)
@@ -1210,16 +1506,20 @@ function handleHelpCommand(options) {
 			console.log("Options:")
 			console.log("  --no-timestamps    Omit timestamp markers in generated Markdown.")
 			console.log("  --timestamps       Include timestamp markers (default).")
+			console.log("  --show <query>     Only export shows whose title matches the query (fuzzy match).")
+			console.log("  --station <query>  Only export shows whose station name matches the query.")
 			console.log("")
 			console.log("Use --sync without additional arguments to scan the TTML cache and export every transcript as Markdown.")
 			return
 		case "list":
-			console.log("Usage: transcripts list [--status <state>] [--limit <n>] [--page <n>] [--json]")
+			console.log("Usage: transcripts list [--status <state>] [--show <query>] [--station <query>] [--limit <n>] [--page <n>] [--json]")
 			console.log("")
 			console.log("Options:")
 			console.log("  --status <state>   Filter by play state (played, unplayed, in-progress, all). Default: all.")
 			console.log("  --limit <n>        Number of rows per page (default: 20).")
 			console.log("  --page <n>         Page number to display (default: 1).")
+			console.log("  --show <query>     Restrict to shows whose titles fuzzy-match the query.")
+			console.log("  --station <query>  Restrict to shows whose station names fuzzy-match the query.")
 			console.log("  --json             Emit JSON output instead of the table view.")
 			return
 		case "copy":
@@ -1234,10 +1534,12 @@ function handleHelpCommand(options) {
 			return
 		case "select":
 		case "interactive":
-			console.log("Usage: transcripts select [--status <state>] [--page-size <n>]")
+			console.log("Usage: transcripts select [--status <state>] [--show <query>] [--station <query>] [--page-size <n>]")
 			console.log("")
 			console.log("Options:")
 			console.log("  --status <state>   Filter by play state before prompting (default: unplayed).")
+			console.log("  --show <query>     Limit selector entries to shows matching the query (fuzzy).")
+			console.log("  --station <query>  Limit selector entries to stations matching the query (fuzzy).")
 			console.log("  --page-size <n>    Number of rows per page in the selector (default: 20).")
 			console.log("")
 			console.log("Interactive mode lets you browse transcripts and copy one to the clipboard.")
@@ -1291,6 +1593,18 @@ function buildCatalogEntry(entry) {
 		(entry && entry.identifier) ||
 		"Unknown episode"
 	const pubDate = metadata && metadata.pubDate ? metadata.pubDate : "unknown-date"
+	const stationTitles = Array.isArray(metadata.stationTitles)
+		? metadata.stationTitles.map((value) => value || "").filter((value) => value)
+		: []
+	const stationSlugs = Array.isArray(metadata.stationSlugs)
+		? metadata.stationSlugs.map((value) => value || "").filter((value) => value)
+		: []
+	const stationTitle =
+		(metadata && metadata.stationTitle && metadata.stationTitle !== "unknown station"
+			? metadata.stationTitle
+			: null) || stationTitles[0] || null
+	const stationSlug =
+		(metadata && metadata.stationSlug ? metadata.stationSlug : null) || stationSlugs[0] || null
 	const sortTimestamp = computeSortTimestamp(
 		pubDate,
 		(entry && entry.lastProcessedAt) || (entry && entry.lastUpdatedAt) || null,
@@ -1308,6 +1622,10 @@ function buildCatalogEntry(entry) {
 		episodeTitle,
 		episodeSlug,
 		pubDate,
+		stationTitle,
+		stationSlug,
+		stationTitles,
+		stationSlugs,
 		playState,
 		statusInfo: getStatusInfo(playState),
 		sortTimestamp,
@@ -1354,11 +1672,12 @@ function compareCatalogEntriesDesc(a, b) {
 	return (a.identifier || "").localeCompare(b.identifier || "")
 }
 
-function filterCatalogEntries(entries, status) {
+function filterEntriesByStatus(entries, status) {
+	const list = Array.isArray(entries) ? entries : []
 	if (!status || status === "all") {
-		return entries.slice()
+		return list.slice()
 	}
-	return entries.filter((entry) => {
+	return list.filter((entry) => {
 		const state = normalizePlayState(entry.playState)
 		if (status === "unplayed") {
 			return state === "unplayed" || state === "inProgress"
@@ -1371,6 +1690,145 @@ function filterCatalogEntries(entries, status) {
 		}
 		return false
 	})
+}
+
+function buildEntryFilterConfig(rawFilters) {
+	if (
+		rawFilters &&
+		typeof rawFilters === "object" &&
+		Array.isArray(rawFilters.showMatchers) &&
+		Array.isArray(rawFilters.stationMatchers) &&
+		Array.isArray(rawFilters.showFilters) &&
+		Array.isArray(rawFilters.stationFilters) &&
+		Object.prototype.hasOwnProperty.call(rawFilters, "status")
+	) {
+		return rawFilters
+	}
+	if (typeof rawFilters === "string" || rawFilters === undefined || rawFilters === null) {
+		const normalizedStatus = typeof rawFilters === "string" ? rawFilters : "all"
+		return {
+			status: normalizedStatus,
+			showFilters: [],
+			stationFilters: [],
+			showMatchers: [],
+			stationMatchers: [],
+		}
+	}
+	const status = rawFilters.status || "all"
+	const showFilters = collectMatchFields(
+		rawFilters.showFilters,
+		rawFilters.show,
+		rawFilters.showQuery,
+	)
+	const stationFilters = collectMatchFields(
+		rawFilters.stationFilters,
+		rawFilters.station,
+		rawFilters.stationQuery,
+	)
+	return {
+		status,
+		showFilters,
+		stationFilters,
+		showMatchers: buildFuzzyMatchers(showFilters),
+		stationMatchers: buildFuzzyMatchers(stationFilters),
+	}
+}
+
+function matchesEntryShow(entry, matchers) {
+	if (!Array.isArray(matchers) || matchers.length === 0) {
+		return true
+	}
+	if (!entry) {
+		return false
+	}
+	const metadata = entry.metadata || {}
+	const fields = collectMatchFields(
+		entry.showTitle,
+		entry.showSlug,
+		metadata.showTitle,
+		metadata.showSlug,
+	)
+	return matchesAnyField(matchers, fields)
+}
+
+function matchesEntryStation(entry, matchers) {
+	if (!Array.isArray(matchers) || matchers.length === 0) {
+		return true
+	}
+	if (!entry) {
+		return false
+	}
+	const metadata = entry.metadata || {}
+	const fields = collectMatchFields(
+		entry.stationTitle,
+		entry.stationSlug,
+		entry.stationTitles,
+		entry.stationSlugs,
+		metadata.stationTitle,
+		metadata.stationSlug,
+		metadata.stationTitles,
+		metadata.stationSlugs,
+	)
+	return matchesAnyField(matchers, fields)
+}
+
+function metadataMatchesFilters(metadata, filterConfig) {
+	if (!filterConfig) {
+		return true
+	}
+	const entryLike = {
+		showTitle: metadata ? metadata.showTitle : null,
+		showSlug: metadata ? metadata.showSlug : null,
+		stationTitle: metadata ? metadata.stationTitle : null,
+		stationSlug: metadata ? metadata.stationSlug : null,
+		stationTitles: metadata && Array.isArray(metadata.stationTitles) ? metadata.stationTitles : [],
+		stationSlugs: metadata && Array.isArray(metadata.stationSlugs) ? metadata.stationSlugs : [],
+		metadata: metadata || null,
+	}
+	const showMatchers = Array.isArray(filterConfig.showMatchers) ? filterConfig.showMatchers : []
+	const stationMatchers = Array.isArray(filterConfig.stationMatchers)
+		? filterConfig.stationMatchers
+		: []
+	if (showMatchers.length > 0 && !matchesEntryShow(entryLike, showMatchers)) {
+		return false
+	}
+	if (stationMatchers.length > 0 && !matchesEntryStation(entryLike, stationMatchers)) {
+		return false
+	}
+	return true
+}
+
+function describeFilterSummary(filters) {
+	if (!filters) {
+		return ""
+	}
+	const parts = []
+	if (filters.status && filters.status !== "all") {
+		parts.push(`status=${filters.status}`)
+	}
+	if (Array.isArray(filters.showFilters) && filters.showFilters.length > 0) {
+		parts.push(`show~${filters.showFilters.join(" OR ")}`)
+	}
+	if (Array.isArray(filters.stationFilters) && filters.stationFilters.length > 0) {
+		parts.push(`station~${filters.stationFilters.join(" OR ")}`)
+	}
+	return parts.join(" | ")
+}
+
+function filterCatalogEntries(entries, rawFilters) {
+	const filterConfig = buildEntryFilterConfig(rawFilters)
+	const showMatchers = Array.isArray(filterConfig.showMatchers) ? filterConfig.showMatchers : []
+	const stationMatchers = Array.isArray(filterConfig.stationMatchers)
+		? filterConfig.stationMatchers
+		: []
+	let result = filterEntriesByStatus(entries, filterConfig.status)
+	if (showMatchers.length > 0) {
+		result = result.filter((entry) => matchesEntryShow(entry, showMatchers))
+	}
+	if (stationMatchers.length > 0) {
+		result = result.filter((entry) => matchesEntryStation(entry, stationMatchers))
+	}
+	return result
 }
 
 function paginateEntries(entries, page, limit) {
@@ -1497,6 +1955,10 @@ function serializeCatalogEntry(entry) {
 		episodeSlug: entry.episodeSlug || null,
 		pubDate: entry.pubDate || null,
 		playState: entry.playState || null,
+		stationTitle: entry.stationTitle || null,
+		stationSlug: entry.stationSlug || null,
+		stationTitles: Array.isArray(entry.stationTitles) ? entry.stationTitles : [],
+		stationSlugs: Array.isArray(entry.stationSlugs) ? entry.stationSlugs : [],
 		relativePath: entry.normalizedRelativePath || entry.relativePath || null,
 		absolutePath: entry.absolutePath || null,
 		hasMarkdown: Boolean(entry.hasMarkdown),
@@ -1527,7 +1989,7 @@ function printToStdout(content) {
 	})
 }
 
-async function handleBatch({ includeTimestamps }) {
+async function handleBatch({ includeTimestamps, showFilters = [], stationFilters = [] }) {
 	ensureTtmlCachePresent()
 	console.log("[INFO] Scanning TTML cache...")
 
@@ -1540,6 +2002,11 @@ async function handleBatch({ includeTimestamps }) {
 	mergeManifestMetadataIntoMap(manifest, metadataMap)
 	const metadataFilenameIndex = buildMetadataFilenameIndex(metadataMap)
 	const filenameCounts = new Map()
+	const filterConfig = buildEntryFilterConfig({
+		status: "all",
+		showFilters,
+		stationFilters,
+	})
 
 	const sortedTtmlFiles = [...ttmlFiles].sort((a, b) => {
 		const metaA = metadataMap.get(a.identifier) || null
@@ -1573,6 +2040,41 @@ async function handleBatch({ includeTimestamps }) {
 		return a.identifier.localeCompare(b.identifier)
 	})
 
+	let filteredTtmlFiles = sortedTtmlFiles
+	const filtersApplied =
+		filterConfig.showMatchers.length > 0 || filterConfig.stationMatchers.length > 0
+	if (filtersApplied) {
+		const allowed = []
+		let skippedCount = 0
+		let skippedMissingMetadata = 0
+		filteredTtmlFiles.forEach((file) => {
+			const metadata = metadataMap.get(file.identifier) || null
+			if (metadataMatchesFilters(metadata, filterConfig)) {
+				allowed.push(file)
+				return
+			}
+			skippedCount += 1
+			if (!metadata) {
+				skippedMissingMetadata += 1
+			}
+		})
+		if (allowed.length === 0) {
+			const summary = describeFilterSummary(filterConfig) || "provided filters"
+			console.log(`[INFO] No TTML files matched filters (${summary}).`)
+			return
+		}
+		const parts = [`matched ${allowed.length}`]
+		if (skippedCount > 0) {
+			const missingLabel =
+				skippedMissingMetadata > 0 ? ` (${skippedMissingMetadata} without metadata)` : ""
+			parts.push(`skipped ${skippedCount}${missingLabel}`)
+		}
+		const summary = describeFilterSummary(filterConfig) || "provided filters"
+		console.log(`[INFO] Filters (${summary}) → ${parts.join(" | ")}`)
+		filteredTtmlFiles = allowed
+		console.log(`[INFO] Processing ${filteredTtmlFiles.length} TTML file(s) after filters.`)
+	}
+
 	const prepManifestChanged = prepareExistingMarkdown(metadataFilenameIndex, manifest)
 
 	const summary = {
@@ -1586,7 +2088,7 @@ async function handleBatch({ includeTimestamps }) {
 
 	const identifiersSet = new Set(identifiers)
 
-	for (const file of sortedTtmlFiles) {
+	for (const file of filteredTtmlFiles) {
 		const metadata = metadataMap.get(file.identifier) || null
 		const showSlug = slugify(metadata ? metadata.showTitle : null, "unknown-show")
 		const rawEpisodeTitle = metadata
@@ -1694,11 +2196,11 @@ async function handleBatch({ includeTimestamps }) {
 
 function printUsage() {
 	console.log("Usage:")
-	console.log("  transcripts [--status <state>] [--page-size <n>]")
-	console.log("  transcripts select [--status <state>] [--page-size <n>]")
-	console.log("  transcripts --sync [--no-timestamps]")
+	console.log("  transcripts [--status <state>] [--show <query>] [--station <query>] [--page-size <n>]")
+	console.log("  transcripts select [--status <state>] [--show <query>] [--station <query>] [--page-size <n>]")
+	console.log("  transcripts --sync [--no-timestamps] [--show <query>] [--station <query>]")
 	console.log("  transcripts sync <input.ttml> <output.md> [--no-timestamps]")
-	console.log("  transcripts list [--status <state>] [--limit <n>] [--page <n>] [--json]")
+	console.log("  transcripts list [--status <state>] [--show <query>] [--station <query>] [--limit <n>] [--page <n>] [--json]")
 	console.log("  transcripts copy <identifier|relativePath> [--print]")
 	console.log("")
 	console.log("Run transcripts help <command> for command-specific options.")
