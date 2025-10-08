@@ -1,6 +1,7 @@
 {
   "name": "apple-podcast-helper",
   "version": "0.0.0",
+  "type": "module",
   "scripts": {
     "transcripts": "node extract-transcripts.js",
     "sync": "node extract-transcripts.js sync"
