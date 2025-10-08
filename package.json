@@ -1,17 +1,17 @@
 {
-	"name": "apple-podcast-helper",
-	"version": "0.0.0",
-	"scripts": {
-		"transcripts": "node extract-transcripts.js",
-		"sync": "node extract-transcripts.js sync"
-	},
-	"dependencies": {
-		"@google/genai": "^1.22.0",
-		"ink": "^6.3.1",
-		"marked": "^16.4.0",
-		"marked-terminal": "^7.3.0",
-		"react": "^19.2.0",
-		"wrap-ansi": "^9.0.2",
-		"xml2js": "^0.6.2"
-	}
+  "name": "apple-podcast-helper",
+  "version": "0.0.0",
+  "scripts": {
+    "transcripts": "node extract-transcripts.js",
+    "sync": "node extract-transcripts.js sync"
+  },
+  "dependencies": {
+    "@google/genai": "^1.22.0",
+    "ink": "^6.3.1",
+    "marked": "^16.4.0",
+    "marked-terminal": "^7.3.0",
+    "react": "^19.2.0",
+    "wrap-ansi": "^9.0.2",
+    "xml2js": "^0.6.2"
+  }
 }
