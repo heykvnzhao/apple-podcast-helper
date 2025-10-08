@@ -40,6 +40,8 @@ coverage/
 
 # Transcripts output
 transcripts/
+# Gemini summaries cache
+summaries/
 
 # Environment variables
 .env
