@@ -20,7 +20,6 @@ Apple Podcast Helper turns the transcripts already cached by the Apple Podcasts 
 2. Install dependencies:
    ```bash
    pnpm install
-   # or: npm install
    ```
 
 ### Optional: Enable Gemini summaries
@@ -31,55 +30,51 @@ Create a `.env` file at the project root with your Gemini API key to enable auto
 echo "GEMINI_API_KEY=your-api-key" >> .env
 ```
 
-When the key is present, the `copy` command and interactive selector keep copying transcripts to your clipboard as before and additionally stream a structured summary generated with the prompt in `prompts/podcasts-summarizer.md`. You'll see a spinner while the LLM works, followed by a live, nicely formatted Markdown summary in the terminal. If the request fails or no key is configured, the CLI falls back to its original clipboard-only behavior.
+When a valid key is present the CLI streams a structured summary (prompt located at `prompts/podcasts-summarizer.md`). If the request fails or no key is configured, the CLI falls back to just producing the transcript and not generating a summary.
 
-## Quick Start
+## Quick start
 
-Run the CLI with Node directly or through the provided `pnpm` scripts. All examples below assume you are inside the project directory.
+Run the CLI directly with Node. Examples assume you're inside the project directory.
 
-### Export transcripts for specific shows
+Quick command reference:
 
-Export every cached transcript whose show title fuzzy-matches your query:
-
-```bash
-node extract-transcripts.js sync --show "Hard Fork"
-# or with pnpm:
-pnpm sync -- --show "Hard Fork"
-```
-
-### Export transcripts by station
-
-Restrict exports to stations (publishers) instead of show titles:
+- Export all cached transcripts:
 
 ```bash
-node extract-transcripts.js sync --station "Daily"
+node extract-transcripts.js
 ```
 
-### Export everything at once
+- Export transcripts for a show (fuzzy match):
 
 ```bash
-node extract-transcripts.js --sync
+node extract-transcripts.js --show "Hard Fork"
 ```
 
-The command above scans the Podcasts cache and writes Markdown into `transcripts/` using the `show-date-title.md` slug pattern (for example `hard-fork-2023-11-17-openai-plot-twist.md`). Re-run the command any time you want to refresh new episodes; existing Markdown files are replaced automatically.
-
-### Control timestamps
-
-Include or remove timestamp markers while exporting:
+- Export transcripts by station (also with fuzzy match):
 
 ```bash
-node extract-transcripts.js sync --no-timestamps --show "Hard Fork"
+node extract-transcripts.js --station "Daily"
 ```
 
-Omit `--no-timestamps` to keep the default minute:second markers.
+- Hide timestamps (remove minute:second markers from markdown):
 
-## Where to find transcripts
+```bash
+node extract-transcripts.js --no-timestamps --show "Hard Fork"
+```
 
-Markdown files are written to the repository’s `transcripts/` folder. Keep that directory untracked, and feel free to clear it (`rm -rf transcripts/*`) before a new export if you want a clean slate.
+- Create an alias to run from anywhere. All transcripts and summaries will be created in the project folder.
+
+```bash
+alias aph='node ~/path/to/apple-podcast-helper/extract-transcripts.js'
+```
+
+## Where to find transcripts and summaries
+
+Markdown files are written to the repository's `transcripts/` and `summaries/` folder. This folder is safe to delete between runs; the tool will recreate or replace files as needed.
 
 ## Help & reference
 
-Every command supports `--help` for full flag details:
+Every command supports `--help` for full flag details. If you need to learn about flags or edge options, run:
 
 ```bash
 node extract-transcripts.js --help
@@ -88,6 +83,6 @@ node extract-transcripts.js help sync
 
 ## Troubleshooting
 
-- **No transcripts exported**: confirm you have played an episode with transcripts available; otherwise Apple Podcasts will not cache a TTML file.
-- **Cache path not found**: make sure you are running on macOS with the Apple Podcasts app. The cache directory does not exist on other platforms.
-- **Stale Markdown files**: delete `transcripts/` and re-run the sync command.
+- **No transcripts exported** — Play an episode with transcripts in the Apple Podcasts app first; the app only caches TTML for episodes you've played.
+- **Cache path not found** — This tool reads the Podcasts cache under `~/Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Library/Cache/Assets/TTML` and only runs on macOS with the Apple Podcasts app installed.
+- **Stale Markdown files** — Remove `transcripts/` and re-run `node extract-transcripts.js sync` (or `pnpm sync`) to regenerate files.
