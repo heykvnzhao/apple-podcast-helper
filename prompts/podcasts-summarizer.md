@@ -58,7 +58,7 @@ Optional. Include 2–10 quotes that represent standout ideas or statistics, phr
 
 ### 5. Closing mentions
 
-Optional. Some podcasts, like The Daily, having closing mentions for topics that aren't directly related to the episode. Please extract those out and give me the key takeaways and insights as well.
+Optional. Some podcasts, like The Daily, having closing mentions for topics that aren't directly related to the episode. Please extract those out and give me the key takeaways and insights as well. Do not include ads.
 
 ---
 
