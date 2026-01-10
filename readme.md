@@ -21,6 +21,7 @@ Apple Podcast Helper turns the transcripts already cached by the Apple Podcasts 
    ```bash
    pnpm install
    ```
+> This repo treats `pnpm-lock.yaml` as the canonical lockfile. If you use `npm install`, please don't commit `package-lock.json`.
 
 ### Optional: Enable Gemini summaries
 
