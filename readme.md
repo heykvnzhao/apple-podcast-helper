@@ -32,6 +32,15 @@ echo "GEMINI_API_KEY=your-api-key" >> .env
 
 When a valid key is present the CLI streams a structured summary (prompt located at `prompts/podcasts-summarizer.md`). If the request fails or no key is configured, the CLI falls back to just producing the transcript and not generating a summary.
 
+### Optional: Override Podcasts cache locations
+
+If you store the Podcasts cache or metadata database in a non-standard location, set overrides in your shell or `.env`:
+
+```bash
+APPLE_PODCASTS_TTML_CACHE_DIR="/path/to/TTML"
+APPLE_PODCASTS_DB_PATH="/path/to/MTLibrary.sqlite"
+```
+
 ## Quick start
 
 Run the CLI directly with Node. Examples assume you're inside the project directory.
