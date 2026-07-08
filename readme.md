@@ -23,13 +23,25 @@ Apple Podcast Helper turns the transcripts already cached by the Apple Podcasts 
    ```
 > This repo treats `pnpm-lock.yaml` as the canonical lockfile. If you use `npm install`, please don't commit `package-lock.json`.
 
-### Optional: Enable Gemini summaries
+### Optional: Enable LLM summaries
 
-Create a `.env` file at the project root with your Gemini API key to enable automatic episode summaries:
+Create a `.env` file at the project root with an API key to enable automatic episode summaries. Gemini remains the default provider:
 
 ```bash
 echo "GEMINI_API_KEY=your-api-key" >> .env
 ```
+
+To opt into DeepSeek V4 Flash instead, set the provider explicitly:
+
+```bash
+cat >> .env <<'EOF'
+LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=your-api-key
+DEEPSEEK_MODEL=deepseek-v4-flash
+EOF
+```
+
+`DEEPSEEK_MODEL` is optional and defaults to `deepseek-v4-flash`. `DEEPSEEK_BASE_URL` is also optional and defaults to `https://api.deepseek.com`.
 
 When a valid key is present the CLI streams a structured summary (prompt located at `prompts/podcasts-summarizer.md`). If the request fails or no key is configured, the CLI falls back to just producing the transcript and not generating a summary.
 

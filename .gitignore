@@ -40,7 +40,7 @@ coverage/
 
 # Transcripts output
 transcripts/
-# Gemini summaries cache
+# LLM summaries cache
 summaries/
 
 # Environment variables
